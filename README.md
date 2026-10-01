@@ -29,6 +29,8 @@ The action runs in **your theme repo** after checkout and build. It does not che
 
 Set `SHOPIFY_CLI_THEME_TOKEN` on the job (typically from `secrets.SHOPIFY_STORE_ACCESS_TOKEN` on each GitHub Environment). Set `SHOPIFY_FLAG_FORCE: 1` at workflow or job level for non-interactive CLI.
 
+Use Node **22+** in the caller workflow (for example via `.nvmrc` and `actions/setup-node`). Current Shopify CLI requires it.
+
 ### Example workflow
 
 Save as `.github/workflows/manual-deploy-production-shopify-theme.yml`. Adjust the matrix to your production environments.
