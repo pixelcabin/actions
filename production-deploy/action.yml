@@ -31,34 +31,27 @@ runs:
 
     - name: Read theme ID from shopify.theme.toml
       id: theme
-      run: |
-        THEME_ID=$(awk -v env="environments.${{ inputs.environment-target }}" '
-          $0 == "[" env "]" { capture=1; next }
-          $0 ~ /^\[/ { capture=0 }
-          capture && /^theme[[:space:]]*=/ { gsub(/[^0-9]/, ""); print; exit }
-        ' shopify.theme.toml)
-        echo "theme-id=${THEME_ID}" >> "$GITHUB_OUTPUT"
+      env:
+        ENVIRONMENT_TARGET: ${{ inputs.environment-target }}
       shell: bash
+      run: bash "$GITHUB_ACTION_PATH/scripts/get-environment-theme-id.sh"
+
+    - name: Get theme name
+      id: theme-name
+      env:
+        ENVIRONMENT_TARGET: ${{ inputs.environment-target }}
+        THEME_ID: ${{ steps.theme.outputs.theme-id }}
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/scripts/get-theme-name-from-id.sh"
 
     - name: Get backup theme name
       id: backup-name
+      env:
+        THEME_NAME: ${{ steps.theme-name.outputs.theme-name }}
+      shell: bash
       run: |
-        ENV="${{ inputs.environment-target }}"
-        THEME_ID="${{ steps.theme.outputs.theme-id }}"
-        if [[ -z "$THEME_ID" ]]; then
-          echo "No theme id in shopify.theme.toml for environment ${ENV}"
-          exit 1
-        fi
-        RAW=$(shopify theme list -e="$ENV" --id="$THEME_ID" --json 2>/dev/null || true)
-        JSON=$(printf '%s\n' "$RAW" | sed -n '/^[[:space:]]*[[{]/,$p')
-        THEME_NAME=$(printf '%s\n' "$JSON" | jq -r 'if type == "array" then .[0].name else .name end' 2>/dev/null || true)
-        if [[ -z "$THEME_NAME" || "$THEME_NAME" == "null" ]]; then
-          echo "No theme named for id ${THEME_ID} in environment ${ENV}"
-          exit 1
-        fi
         NAME=$(printf 'Backup of %s' "$THEME_NAME" | cut -c1-50)
         echo "backup-theme-name=${NAME}" >> "$GITHUB_OUTPUT"
-      shell: bash
 
     - name: Duplicate production theme as backup
       env:
