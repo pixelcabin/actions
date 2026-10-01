@@ -45,53 +45,22 @@ runs:
       run: |
         ENV="${{ inputs.environment-target }}"
         THEME_ID="${{ steps.theme.outputs.theme-id }}"
-        if [[ -n "$THEME_ID" ]]; then
-          SHORT_DATE=$(date +%y%m%d-%H%M)
-          NAME=$(printf '[BK] %s-%s %s' "$ENV" "$THEME_ID" "$SHORT_DATE" | cut -c1-50)
-        else
-          CURRENT_DATE=$(date +%Y-%m-%d:%H:%M:%S)
-          NAME=$(printf '[BK] %s %s' "$ENV" "$CURRENT_DATE" | cut -c1-50)
+        if [[ -z "$THEME_ID" ]]; then
+          echo "No theme id in shopify.theme.toml for environment ${ENV}"
+          exit 1
         fi
+        SHORT_DATE=$(date +%y%m%d-%H%M)
+        NAME=$(printf '[BK] %s-%s %s' "$ENV" "$THEME_ID" "$SHORT_DATE" | cut -c1-50)
         echo "backup-theme-name=${NAME}" >> "$GITHUB_OUTPUT"
       shell: bash
 
-    - name: Create backup directory
-      run: mkdir -p backup
-      shell: bash
-
-    - name: Download current production theme
+    - name: Duplicate production theme as backup
       run: |
-        if [[ -n "${{ steps.theme.outputs.theme-id }}" ]]; then
-          shopify theme pull -e="${{ inputs.environment-target }}" -t="${{ steps.theme.outputs.theme-id }}" --ignore="EMPTY_VALUE" --path="backup"
-        else
-          shopify theme pull -e="${{ inputs.environment-target }}" --ignore="EMPTY_VALUE" --path="backup"
-        fi
-      shell: bash
-
-    - name: Copy font assets into backup
-      run: |
-        THEME_PATH="${{ inputs.path }}"
-        if [[ -d "$THEME_PATH" ]]; then
-          FONTS=$(find "$THEME_PATH" -type f \( -iname '*.woff' -o -iname '*.woff2' -o -iname '*.ttf' -o -iname '*.otf' -o -iname '*.eot' \) 2>/dev/null || true)
-          if [[ -n "$FONTS" ]]; then
-            while IFS= read -r FONT; do
-              [[ -z "$FONT" ]] && continue
-              REL="${FONT#"${THEME_PATH}"/}"
-              mkdir -p "backup/$(dirname "$REL")"
-              cp "$FONT" "backup/$REL"
-              echo "Copied font asset to backup: $REL"
-            done <<< "$FONTS"
-          fi
-        fi
-      shell: bash
-
-    - name: Push backup theme
-      run: |
-        shopify theme push -e="${{ inputs.environment-target }}" -u -t="${{ steps.backup-name.outputs.backup-theme-name }}" --ignore="EMPTY_VALUE" --path="backup"
-      shell: bash
-
-    - name: Delete backup directory
-      run: rm -rf backup
+        shopify theme duplicate \
+          -e="${{ inputs.environment-target }}" \
+          -t="${{ steps.theme.outputs.theme-id }}" \
+          -n="${{ steps.backup-name.outputs.backup-theme-name }}" \
+          --force
       shell: bash
 
     - name: Push theme to production
