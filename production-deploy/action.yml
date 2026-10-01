@@ -50,7 +50,12 @@ runs:
         THEME_NAME: ${{ steps.theme-name.outputs.theme-name }}
       shell: bash
       run: |
-        NAME=$(printf 'Backup of %s' "$THEME_NAME" | cut -c1-50)
+        STAMP=$(date -u +'%Y-%m-%d %H:%M')
+        SUFFIX=" (${STAMP})"
+        PREFIX="Backup of "
+        MAX_THEME_LEN=$((50 - ${#PREFIX} - ${#SUFFIX}))
+        SHORT_THEME=$(printf '%s' "$THEME_NAME" | cut -c1-"$MAX_THEME_LEN")
+        NAME="${PREFIX}${SHORT_THEME}${SUFFIX}"
         echo "backup-theme-name=${NAME}" >> "$GITHUB_OUTPUT"
 
     - name: Duplicate production theme as backup
