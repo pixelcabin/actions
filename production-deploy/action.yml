@@ -73,6 +73,12 @@ runs:
       run: shopify theme push -a -e="${{ inputs.environment-target }}" --path="${{ inputs.path }}"
       shell: bash
 
+    - name: Read package version
+      id: package-version
+      if: ${{ !cancelled() }}
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/scripts/get-package-version.sh"
+
     - name: Notify Slack
       if: ${{ inputs.slack-webhook != '' && !cancelled() }}
       uses: slackapi/slack-github-action@v4
@@ -85,8 +91,8 @@ runs:
             - type: section
               text:
                 type: mrkdwn
-                text: "*Production deploy ${{ job.status }}*\n*Environment:* `${{ inputs.environment-target }}`\n*Theme:* ${{ steps.theme-name.outputs.theme-name }} (`${{ steps.theme.outputs.theme-id }}`)\n*Backup:* ${{ steps.backup-name.outputs.backup-theme-name }}"
+                text: "*Production deploy ${{ job.status }}*\n*Environment:* `${{ inputs.environment-target }}`\n*Version:* ${{ steps.package-version.outputs.version || 'unknown' }}\n*Theme:* ${{ steps.theme-name.outputs.theme-name }} (`${{ steps.theme.outputs.theme-id }}`)\n*Backup:* ${{ steps.backup-name.outputs.backup-theme-name }}\n*Repository:* <${{ github.server_url }}/${{ github.repository }}|${{ github.server_url }}/${{ github.repository }}>"
             - type: context
               elements:
                 - type: mrkdwn
-                  text: "${{ github.repository }} · ${{ github.workflow }} · ${{ github.actor }} · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  text: "${{ github.workflow }} · ${{ github.actor }} · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
