@@ -22,7 +22,7 @@ The action runs in **your theme repo** after checkout and build. It does not che
 
 ### What the action does
 
-1. Duplicates the theme configured in toml (`shopify theme duplicate`) as an unpublished backup named `[BK] {environment}-{themeId} {timestamp}`. The copy is made on Shopify, so fonts and JSON stay intact.
+1. Looks up that theme's current name with `shopify theme list --id`, then duplicates it (`shopify theme duplicate`) as an unpublished backup named `Backup of {theme name}` (50 characters max). The copy is made on Shopify, so fonts and JSON stay intact.
 2. Pushes your built theme to the same theme id, honoring toml `ignore` so merchant JSON and settings are not overwritten
 
 Set `SHOPIFY_CLI_THEME_TOKEN` on the job (typically from `secrets.SHOPIFY_STORE_ACCESS_TOKEN` on each GitHub Environment). Set `SHOPIFY_FLAG_FORCE: 1` at workflow or job level for non-interactive CLI.
