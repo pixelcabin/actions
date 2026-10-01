@@ -89,7 +89,7 @@ The production environment in `shopify.theme.toml` must set a numeric `theme` id
 | Secret | Where |
 |--------|--------|
 | `SHOPIFY_STORE_ACCESS_TOKEN` | Each GitHub Environment (Admin API app with `read_themes` / `write_themes`) |
-| `SLACK_WEBHOOK_URL` | Optional, repo or environment secret |
+| `SLACK_WEBHOOK_URL` | Optional incoming webhook (`https://hooks.slack.com/services/...`). The message is the payload in `production-deploy/action.yml`. |
 
 ## Versioning
 

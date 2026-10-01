@@ -15,7 +15,7 @@ inputs:
     required: false
     default: "."
   slack-webhook:
-    description: "Slack incoming webhook URL for job status"
+    description: "Slack incoming webhook URL. Posts a deploy summary when set."
     required: false
   shopify-cli-version:
     description: "Shopify CLI version to install"
@@ -73,10 +73,20 @@ runs:
       run: shopify theme push -a -e="${{ inputs.environment-target }}" --path="${{ inputs.path }}"
       shell: bash
 
-    - uses: 8398a7/action-slack@v3
-      if: ${{ inputs.slack-webhook != '' }}
+    - name: Notify Slack
+      if: ${{ inputs.slack-webhook != '' && !cancelled() }}
+      uses: slackapi/slack-github-action@v4
       with:
-        status: ${{ job.status }}
-        fields: repo,author,workflow,job
-      env:
-        SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook }}
+        webhook: ${{ inputs.slack-webhook }}
+        webhook-type: incoming-webhook
+        payload: |
+          text: "Production deploy ${{ job.status }} for ${{ inputs.environment-target }}"
+          blocks:
+            - type: section
+              text:
+                type: mrkdwn
+                text: "*Production deploy ${{ job.status }}*\n*Environment:* `${{ inputs.environment-target }}`\n*Theme:* ${{ steps.theme-name.outputs.theme-name }} (`${{ steps.theme.outputs.theme-id }}`)\n*Backup:* ${{ steps.backup-name.outputs.backup-theme-name }}"
+            - type: context
+              elements:
+                - type: mrkdwn
+                  text: "${{ github.repository }} · ${{ github.workflow }} · ${{ github.actor }} · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
