@@ -1,0 +1,107 @@
+name: "Production deploy"
+description: "Back up the current Shopify production theme, then push the built theme from the caller workspace"
+author: "Pixelcabin"
+
+branding:
+  icon: "upload-cloud"
+  color: "blue"
+
+inputs:
+  environment-target:
+    description: "shopify.theme.toml environment name and GitHub Environment name"
+    required: true
+  path:
+    description: "Path to theme files in the caller repo"
+    required: false
+    default: "."
+  slack-webhook:
+    description: "Slack incoming webhook URL for job status"
+    required: false
+  shopify-cli-version:
+    description: "Shopify CLI version to install"
+    required: false
+    default: "4.8.0"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Shopify CLI
+      run: npm install -g @shopify/cli@${{ inputs.shopify-cli-version }}
+      shell: bash
+
+    - name: Read theme ID from shopify.theme.toml
+      id: theme
+      run: |
+        THEME_ID=$(awk -v env="environments.${{ inputs.environment-target }}" '
+          $0 == "[" env "]" { capture=1; next }
+          $0 ~ /^\[/ { capture=0 }
+          capture && /^theme[[:space:]]*=/ { gsub(/[^0-9]/, ""); print; exit }
+        ' shopify.theme.toml)
+        echo "theme-id=${THEME_ID}" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Get backup theme name
+      id: backup-name
+      run: |
+        ENV="${{ inputs.environment-target }}"
+        THEME_ID="${{ steps.theme.outputs.theme-id }}"
+        if [[ -n "$THEME_ID" ]]; then
+          SHORT_DATE=$(date +%y%m%d-%H%M)
+          NAME=$(printf '[BK] %s-%s %s' "$ENV" "$THEME_ID" "$SHORT_DATE" | cut -c1-50)
+        else
+          CURRENT_DATE=$(date +%Y-%m-%d:%H:%M:%S)
+          NAME=$(printf '[BK] %s %s' "$ENV" "$CURRENT_DATE" | cut -c1-50)
+        fi
+        echo "backup-theme-name=${NAME}" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Create backup directory
+      run: mkdir -p backup
+      shell: bash
+
+    - name: Download current production theme
+      run: |
+        if [[ -n "${{ steps.theme.outputs.theme-id }}" ]]; then
+          shopify theme pull -e="${{ inputs.environment-target }}" -t="${{ steps.theme.outputs.theme-id }}" --ignore="EMPTY_VALUE" --path="backup"
+        else
+          shopify theme pull -e="${{ inputs.environment-target }}" --ignore="EMPTY_VALUE" --path="backup"
+        fi
+      shell: bash
+
+    - name: Copy font assets into backup
+      run: |
+        THEME_PATH="${{ inputs.path }}"
+        if [[ -d "$THEME_PATH" ]]; then
+          FONTS=$(find "$THEME_PATH" -type f \( -iname '*.woff' -o -iname '*.woff2' -o -iname '*.ttf' -o -iname '*.otf' -o -iname '*.eot' \) 2>/dev/null || true)
+          if [[ -n "$FONTS" ]]; then
+            while IFS= read -r FONT; do
+              [[ -z "$FONT" ]] && continue
+              REL="${FONT#"${THEME_PATH}"/}"
+              mkdir -p "backup/$(dirname "$REL")"
+              cp "$FONT" "backup/$REL"
+              echo "Copied font asset to backup: $REL"
+            done <<< "$FONTS"
+          fi
+        fi
+      shell: bash
+
+    - name: Push backup theme
+      run: |
+        shopify theme push -e="${{ inputs.environment-target }}" -u -t="${{ steps.backup-name.outputs.backup-theme-name }}" --ignore="EMPTY_VALUE" --path="backup"
+      shell: bash
+
+    - name: Delete backup directory
+      run: rm -rf backup
+      shell: bash
+
+    - name: Push theme to production
+      run: shopify theme push -a -e="${{ inputs.environment-target }}" --path="${{ inputs.path }}"
+      shell: bash
+
+    - uses: 8398a7/action-slack@v3
+      if: ${{ inputs.slack-webhook != '' }}
+      with:
+        status: ${{ job.status }}
+        fields: repo,author,workflow,job
+      env:
+        SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook }}
