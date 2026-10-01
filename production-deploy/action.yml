@@ -49,17 +49,25 @@ runs:
           echo "No theme id in shopify.theme.toml for environment ${ENV}"
           exit 1
         fi
-        SHORT_DATE=$(date +%y%m%d-%H%M)
-        NAME=$(printf '[BK] %s-%s %s' "$ENV" "$THEME_ID" "$SHORT_DATE" | cut -c1-50)
+        RAW=$(shopify theme list -e="$ENV" --id="$THEME_ID" --json 2>/dev/null || true)
+        JSON=$(printf '%s\n' "$RAW" | sed -n '/^[[:space:]]*[[{]/,$p')
+        THEME_NAME=$(printf '%s\n' "$JSON" | jq -r 'if type == "array" then .[0].name else .name end' 2>/dev/null || true)
+        if [[ -z "$THEME_NAME" || "$THEME_NAME" == "null" ]]; then
+          echo "No theme named for id ${THEME_ID} in environment ${ENV}"
+          exit 1
+        fi
+        NAME=$(printf 'Backup of %s' "$THEME_NAME" | cut -c1-50)
         echo "backup-theme-name=${NAME}" >> "$GITHUB_OUTPUT"
       shell: bash
 
     - name: Duplicate production theme as backup
+      env:
+        BACKUP_THEME_NAME: ${{ steps.backup-name.outputs.backup-theme-name }}
       run: |
         shopify theme duplicate \
           -e="${{ inputs.environment-target }}" \
           -t="${{ steps.theme.outputs.theme-id }}" \
-          -n="${{ steps.backup-name.outputs.backup-theme-name }}" \
+          -n="$BACKUP_THEME_NAME" \
           --force
       shell: bash
 
