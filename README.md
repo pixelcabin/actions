@@ -22,10 +22,8 @@ The action runs in **your theme repo** after checkout and build. It does not che
 
 ### What the action does
 
-1. Pulls the theme configured in toml for the given environment
-2. Pushes an unpublished backup named `[BK] {environment}-{themeId} {timestamp}` (full copy, including JSON)
-3. Copies font binaries from your build into the backup (pull can omit them)
-4. Pushes your built theme to the same theme id, honoring toml `ignore` so merchant JSON and settings are not overwritten
+1. Duplicates the theme configured in toml (`shopify theme duplicate`) as an unpublished backup named `[BK] {environment}-{themeId} {timestamp}`. The copy is made on Shopify, so fonts and JSON stay intact.
+2. Pushes your built theme to the same theme id, honoring toml `ignore` so merchant JSON and settings are not overwritten
 
 Set `SHOPIFY_CLI_THEME_TOKEN` on the job (typically from `secrets.SHOPIFY_STORE_ACCESS_TOKEN` on each GitHub Environment). Set `SHOPIFY_FLAG_FORCE: 1` at workflow or job level for non-interactive CLI.
 
@@ -83,6 +81,8 @@ jobs:
 If theme files live under `shop/`, set `path: shop`. Omit `slack-webhook` to skip Slack.
 
 The `if: github.ref == 'refs/heads/main'` guard is on the **job**, not on the action, so you can use a test branch without that guard when validating the action.
+
+The production environment in `shopify.theme.toml` must set a numeric `theme` id. `theme duplicate` copies that remote theme; it does not fall back to the live theme.
 
 ### Secrets
 
